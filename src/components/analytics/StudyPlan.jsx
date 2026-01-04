@@ -4,32 +4,39 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { usePDF } from '../../context/PDFContext';
-import { useLearningState } from '../../hooks/useLearningState';
-import { generateStudyPlan, generateRevisionSheet } from '../../config/gemini';
 import { Button } from '../ui/Button';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function StudyPlan() {
     const { pdfContent, hasPDF } = usePDF();
-    const { learningState } = useLearningState();
     const [studyPlan, setStudyPlan] = useState('');
     const [revisionSheet, setRevisionSheet] = useState('');
     const [isLoadingPlan, setIsLoadingPlan] = useState(false);
     const [isLoadingSheet, setIsLoadingSheet] = useState(false);
     const [activeTab, setActiveTab] = useState('plan');
+    const [error, setError] = useState(null);
 
     async function handleGeneratePlan() {
         if (!pdfContent) return;
 
         setIsLoadingPlan(true);
+        setError(null);
         try {
-            const plan = await generateStudyPlan(
-                pdfContent,
-                learningState?.weakConcepts || []
-            );
-            setStudyPlan(plan);
+            const response = await fetch(`${API_BASE_URL}/api/study-plan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: pdfContent, weakConcepts: [] })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to generate study plan');
+
+            setStudyPlan(data.studyPlan);
             setActiveTab('plan');
-        } catch (error) {
-            console.error('Error generating study plan:', error);
+        } catch (err) {
+            setError(err.message);
+            console.error('Error generating study plan:', err);
         } finally {
             setIsLoadingPlan(false);
         }
@@ -39,15 +46,22 @@ export function StudyPlan() {
         if (!pdfContent) return;
 
         setIsLoadingSheet(true);
+        setError(null);
         try {
-            const sheet = await generateRevisionSheet(
-                pdfContent,
-                learningState?.weakConcepts || []
-            );
-            setRevisionSheet(sheet);
+            const response = await fetch(`${API_BASE_URL}/api/revision-sheet`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: pdfContent, weakConcepts: [] })
+            });
+
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'Failed to generate revision sheet');
+
+            setRevisionSheet(data.revisionSheet);
             setActiveTab('sheet');
-        } catch (error) {
-            console.error('Error generating revision sheet:', error);
+        } catch (err) {
+            setError(err.message);
+            console.error('Error generating revision sheet:', err);
         } finally {
             setIsLoadingSheet(false);
         }
@@ -101,8 +115,8 @@ export function StudyPlan() {
                         <button
                             onClick={() => setActiveTab('plan')}
                             className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${activeTab === 'plan'
-                                    ? 'bg-accent-purple text-white'
-                                    : 'text-gray-400 hover:text-white'
+                                ? 'bg-accent-purple text-white'
+                                : 'text-gray-400 hover:text-white'
                                 }`}
                             disabled={!studyPlan}
                         >
@@ -111,8 +125,8 @@ export function StudyPlan() {
                         <button
                             onClick={() => setActiveTab('sheet')}
                             className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${activeTab === 'sheet'
-                                    ? 'bg-accent-purple text-white'
-                                    : 'text-gray-400 hover:text-white'
+                                ? 'bg-accent-purple text-white'
+                                : 'text-gray-400 hover:text-white'
                                 }`}
                             disabled={!revisionSheet}
                         >

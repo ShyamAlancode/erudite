@@ -4,7 +4,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { usePDF } from '../../context/PDFContext';
-import { extractConceptMap } from '../../config/gemini';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function ConceptMap() {
     const { pdfContent, hasPDF } = usePDF();
@@ -15,6 +16,9 @@ export function ConceptMap() {
 
     // Color palette for different concept groups
     const colorPalette = useMemo(() => ({
+        'main': '#8b5cf6',
+        'sub': '#3b82f6',
+        'detail': '#06b6d4',
         'core': '#8b5cf6',
         'fundamental': '#3b82f6',
         'advanced': '#ec4899',
@@ -32,24 +36,35 @@ export function ConceptMap() {
             setError(null);
 
             try {
-                const data = await extractConceptMap(pdfContent);
+                const response = await fetch(`${API_BASE_URL}/api/concept-map`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: pdfContent })
+                });
 
-                // Add colors to nodes based on their group
-                const coloredNodes = data.nodes.map(node => ({
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate concept map');
+                }
+
+                // Add colors to nodes based on their category
+                const coloredNodes = (data.nodes || []).map(node => ({
                     ...node,
-                    color: colorPalette[node.group?.toLowerCase()] || colorPalette.default,
-                    val: 8 // Node size
+                    label: node.name || node.label || node.id,
+                    color: colorPalette[node.category?.toLowerCase()] || colorPalette[node.group?.toLowerCase()] || colorPalette.default,
+                    val: 8
                 }));
 
                 setGraphData({
                     nodes: coloredNodes,
-                    links: data.links.map(link => ({
+                    links: (data.links || []).map(link => ({
                         ...link,
                         color: 'rgba(139, 92, 246, 0.4)'
                     }))
                 });
             } catch (err) {
-                setError('Failed to extract concept map. Please try again.');
+                setError(err.message || 'Failed to extract concept map. Please try again.');
                 console.error(err);
             } finally {
                 setIsLoading(false);
