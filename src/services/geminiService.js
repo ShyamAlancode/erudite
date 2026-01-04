@@ -1,16 +1,14 @@
-// Gemini Service
-// Manages chat sessions with the teaching agent
+// Gemini Service (API-based)
+// Manages chat sessions with the teaching agent via backend API
 
-import { createTeachingModel } from '../config/gemini';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 /**
  * Chat Session Manager
- * Maintains conversation history and provides methods for interacting with Erudite
+ * Communicates with the backend API for Erudite teaching responses
  */
 class GeminiService {
     constructor() {
-        this.chat = null;
-        this.model = null;
         this.pdfContent = '';
         this.difficulty = 'beginner';
         this.conversationHistory = [];
@@ -20,37 +18,21 @@ class GeminiService {
      * Initialize or reinitialize the chat session with new context
      * @param {string} pdfContent - The extracted PDF text
      * @param {string} difficulty - beginner/intermediate/exam
-     * @param {string} learningState - JSON of past misconceptions
+     * @param {string} learningState - JSON of past misconceptions (unused for now)
      */
     initializeChat(pdfContent = '', difficulty = 'beginner', learningState = '') {
         this.pdfContent = pdfContent;
         this.difficulty = difficulty;
-
-        // Create the model with full context
-        this.model = createTeachingModel(pdfContent, difficulty, learningState);
-
-        // Start a new chat session
-        this.chat = this.model.startChat({
-            history: this.conversationHistory.map(msg => ({
-                role: msg.role === 'user' ? 'user' : 'model',
-                parts: [{ text: msg.content }]
-            }))
-        });
-
+        this.conversationHistory = [];
         return true;
     }
 
     /**
-     * Send a message to Erudite and get a response
+     * Send a message to Erudite and get a response via backend API
      * @param {string} message - The user's message
      * @returns {Promise<string>} - Erudite's response
      */
     async sendMessage(message) {
-        if (!this.chat) {
-            // Initialize with default settings if not already initialized
-            this.initializeChat(this.pdfContent, this.difficulty, '');
-        }
-
         try {
             // Add user message to history
             this.conversationHistory.push({
@@ -59,20 +41,42 @@ class GeminiService {
                 timestamp: new Date().toISOString()
             });
 
-            // Send message and get response
-            const result = await this.chat.sendMessage(message);
-            const response = result.response.text();
+            // Call backend API with PDF context
+            const response = await fetch(`${API_BASE_URL}/api/chat/context`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message,
+                    context: this.pdfContent,
+                    difficulty: this.difficulty
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.details || data.error || 'Failed to get response');
+            }
 
             // Add assistant response to history
             this.conversationHistory.push({
                 role: 'assistant',
-                content: response,
+                content: data.reply,
                 timestamp: new Date().toISOString()
             });
 
-            return response;
+            return data.reply;
         } catch (error) {
+            // Remove failed user message from history
+            this.conversationHistory.pop();
             console.error('Error sending message:', error);
+
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error('Cannot connect to server. Is the backend running on port 3001?');
+            }
+
             throw new Error('Failed to get response from Erudite. Please try again.');
         }
     }
@@ -83,8 +87,6 @@ class GeminiService {
      */
     setDifficulty(difficulty) {
         this.difficulty = difficulty;
-        // Reinitialize with new difficulty (keeps conversation history)
-        this.initializeChat(this.pdfContent, difficulty, '');
     }
 
     /**
@@ -100,9 +102,6 @@ class GeminiService {
      */
     clearHistory() {
         this.conversationHistory = [];
-        if (this.model) {
-            this.chat = this.model.startChat({ history: [] });
-        }
     }
 
     /**
