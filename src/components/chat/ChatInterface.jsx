@@ -10,8 +10,15 @@ import { TypingIndicator } from './TypingIndicator';
 export function ChatInterface() {
     const [input, setInput] = useState('');
     const messagesEndRef = useRef(null);
-    const { messages, isLoading, difficulty, sendMessage, changeDifficulty, clearChat } = useChat();
-    const { hasPDF } = usePDF();
+    const { messages, isLoading, difficulty, sendMessage, changeDifficulty, clearChat, setChatPdfContent } = useChat();
+    const { hasPDF, pdfContent } = usePDF();
+
+    // Sync PDF content to chat context when it changes
+    useEffect(() => {
+        if (setChatPdfContent && pdfContent) {
+            setChatPdfContent(pdfContent);
+        }
+    }, [pdfContent, setChatPdfContent]);
 
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {

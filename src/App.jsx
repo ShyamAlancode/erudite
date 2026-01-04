@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { PDFProvider } from './context/PDFContext';
+import { ChatProvider } from './context/ChatContext';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 import { Dashboard } from './pages/Dashboard';
@@ -60,7 +61,9 @@ function AuthenticatedApp() {
 
   return (
     <PDFProvider>
-      <Dashboard />
+      <ChatProvider>
+        <Dashboard />
+      </ChatProvider>
     </PDFProvider>
   );
 }

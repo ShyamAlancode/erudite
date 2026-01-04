@@ -1,9 +1,9 @@
-// DeepSeek Chatbot Component
-// General-purpose AI chatbot powered by DeepSeek
+// Aletheia Chatbot Component
+// General-purpose AI chatbot powered by Gemini
 
 import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { deepseekService } from '../../services/deepseekService';
+import { aletheiaService } from '../../services/aletheiaService';
 
 export function DeepSeekChat() {
     const [messages, setMessages] = useState([]);
@@ -34,7 +34,7 @@ export function DeepSeekChat() {
         setError(null);
 
         try {
-            const response = await deepseekService.sendMessage(input.trim());
+            const response = await aletheiaService.sendMessage(input.trim());
 
             const assistantMessage = {
                 id: (Date.now() + 1).toString(),
@@ -59,7 +59,7 @@ export function DeepSeekChat() {
 
     function handleClearChat() {
         setMessages([]);
-        deepseekService.clearHistory();
+        aletheiaService.clearHistory();
     }
 
     return (
@@ -73,8 +73,8 @@ export function DeepSeekChat() {
                         </svg>
                     </div>
                     <div>
-                        <h2 className="text-lg font-semibold text-white">DeepSeek AI</h2>
-                        <p className="text-xs text-gray-400">General-purpose AI Assistant</p>
+                        <h2 className="text-lg font-semibold text-white">Aletheia</h2>
+                        <p className="text-xs text-gray-400">Your AI Assistant</p>
                     </div>
                 </div>
 
@@ -97,7 +97,7 @@ export function DeepSeekChat() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                             </svg>
                         </div>
-                        <h3 className="text-xl font-semibold text-white mb-2">DeepSeek AI Chatbot</h3>
+                        <h3 className="text-xl font-semibold text-white mb-2">Aletheia</h3>
                         <p className="text-gray-400 max-w-sm mb-6">
                             Your general-purpose AI assistant. Ask me anything!
                         </p>
@@ -129,9 +129,9 @@ export function DeepSeekChat() {
                                     {message.role !== 'user' && message.role !== 'error' && (
                                         <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
                                             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
-                                                <span className="text-xs font-bold">D</span>
+                                                <span className="text-xs font-bold">A</span>
                                             </div>
-                                            <span className="text-sm font-medium text-cyan-400">DeepSeek</span>
+                                            <span className="text-sm font-medium text-cyan-400">Aletheia</span>
                                         </div>
                                     )}
 
@@ -166,9 +166,9 @@ export function DeepSeekChat() {
                                 <div className="glass-dark rounded-2xl rounded-bl-sm px-5 py-4">
                                     <div className="flex items-center gap-2">
                                         <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
-                                            <span className="text-xs font-bold">D</span>
+                                            <span className="text-xs font-bold">A</span>
                                         </div>
-                                        <span className="text-sm font-medium text-cyan-400">DeepSeek is thinking</span>
+                                        <span className="text-sm font-medium text-cyan-400">Aletheia is thinking</span>
                                     </div>
                                     <div className="flex items-center gap-1 mt-3">
                                         <div className="w-2 h-2 bg-cyan-400 rounded-full typing-dot"></div>
@@ -191,7 +191,7 @@ export function DeepSeekChat() {
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Ask DeepSeek anything..."
+                        placeholder="Ask Aletheia anything..."
                         disabled={isLoading}
                         className="flex-1 px-4 py-3 rounded-xl bg-dark-700 border border-white/10 text-white
                        placeholder-gray-500 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400
