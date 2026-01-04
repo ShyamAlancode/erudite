@@ -132,27 +132,11 @@ app.post('/api/chat', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Gemini API Error:', error.message);
+        console.error("❌ Gemini Chat Error FULL:", error);
 
-        // Handle specific error types
-        if (error.message?.includes('quota')) {
-            return res.status(429).json({
-                error: 'Rate limit exceeded',
-                details: 'API quota reached. Please wait a moment and try again.'
-            });
-        }
-
-        if (error.message?.includes('API key')) {
-            return res.status(401).json({
-                error: 'Authentication error',
-                details: 'Invalid API key configuration.'
-            });
-        }
-
-        // Generic error response
-        return res.status(500).json({
-            error: 'Internal server error',
-            details: 'Failed to get response from AI. Please try again.'
+        res.status(500).json({
+            error: "Failed to generate response",
+            details: error.message || "Unknown Gemini error"
         });
     }
 });
