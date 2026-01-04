@@ -92,37 +92,40 @@ app.get('/api/health', (req, res) => {
  * Request body: { "message": "user question here" }
  * Response: { "reply": "Gemini response here" }
  */
-app.post('/api/chat', async (req, res) => {
+app.post("/api/chat", async (req, res) => {
     try {
         const { message } = req.body;
 
-        if (!message || typeof message !== 'string') {
-            return res.status(400).json({ error: 'Message must be a string' });
+        if (!message || typeof message !== "string") {
+            return res.status(400).json({ error: "Message must be a string" });
         }
 
-        // Initialize model with system instruction
         const model = genAI.getGenerativeModel({
-            model: 'models/gemini-flash-lite-latest',
-            config: {
-                systemInstruction: SYSTEM_PROMPT,
-            }
+            model: "models/gemini-flash-lite-latest",
         });
 
-        // Generate content (stateless)
-        const result = await model.generateContent(message.trim());
-        const reply = result.response.text();
+        const result = await model.generateContent({
+            contents: [
+                {
+                    role: "user",
+                    parts: [{ text: message.trim() }]
+                }
+            ]
+        });
+
+        const response = result.response;
 
         res.json({
-            reply,
-            model: 'gemini-flash-lite-latest'
+            reply: response.text(),
         });
 
     } catch (error) {
-        console.error("❌ Gemini Chat Error FULL:", error);
+        console.error("❌ FULL GEMINI ERROR ↓↓↓");
+        console.error(error);
 
         res.status(500).json({
             error: "Failed to generate response",
-            details: error.message || "Unknown Gemini error"
+            details: error?.message || String(error)
         });
     }
 });
