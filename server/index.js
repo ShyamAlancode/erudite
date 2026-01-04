@@ -103,7 +103,9 @@ app.post('/api/chat', async (req, res) => {
         // Initialize model with system instruction
         const model = genAI.getGenerativeModel({
             model: 'models/gemini-flash-lite-latest',
-            systemInstruction: SYSTEM_PROMPT,
+            config: {
+                systemInstruction: SYSTEM_PROMPT,
+            }
         });
 
         // Generate content (stateless)
@@ -158,7 +160,9 @@ app.post('/api/chat/context', async (req, res) => {
 
         const model = genAI.getGenerativeModel({
             model: 'models/gemini-flash-lite-latest',
-            systemInstruction: enhancedPrompt,
+            config: {
+                systemInstruction: enhancedPrompt,
+            }
         });
 
         const result = await model.generateContent(message.trim());
