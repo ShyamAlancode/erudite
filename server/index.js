@@ -18,7 +18,7 @@ const genAI = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
 });
 
-/* Middleware */
+/* 🔴 THIS MUST COME BEFORE ROUTES */
 app.use(cors());
 app.use(express.json());
 
