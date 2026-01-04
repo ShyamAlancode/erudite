@@ -7,6 +7,7 @@ import { Learn } from './Learn';
 import { Analytics } from './Analytics';
 import { ConceptMap } from '../components/analytics/ConceptMap';
 import { StudyPlan } from '../components/analytics/StudyPlan';
+import { DeepSeekChat } from '../components/chat/DeepSeekChat';
 
 export function Dashboard() {
     const [currentPage, setCurrentPage] = useState('learn');
@@ -15,6 +16,8 @@ export function Dashboard() {
         switch (currentPage) {
             case 'learn':
                 return <Learn />;
+            case 'deepseek':
+                return <DeepSeekChat />;
             case 'concepts':
                 return <ConceptMap />;
             case 'analytics':
