@@ -177,8 +177,7 @@ app.post('/api/chat/context', async (req, res) => {
             systemInstruction: enhancedPrompt,
         });
 
-        const chat = model.startChat({ history: [] });
-        const result = await chat.sendMessage(message.trim());
+        const result = await model.generateContent(message.trim());
         const reply = result.response.text();
 
         return res.json({ reply });
