@@ -1,14 +1,14 @@
 // =============================================================
 // ERUDITE BACKEND SERVER
-// Express.js server with Gemini AI integration
+// Express.js server with Gemini AI integration (NEW SDK)
 // =============================================================
 
-import express from 'express';
-import cors from 'cors';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { GoogleGenAI } from "@google/genai";
 
-// Load environment variables from .env file
+// Load environment variables
 dotenv.config();
 
 // =============================================================
@@ -18,35 +18,34 @@ dotenv.config();
 const PORT = process.env.PORT || 3001;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// Validate API key exists
+// Validate API key
 if (!GEMINI_API_KEY) {
-    console.error('❌ ERROR: GEMINI_API_KEY is not set in environment variables');
-    console.error('   Please add GEMINI_API_KEY=your_key_here to your .env file');
-    process.exit(1);
+  console.error("❌ ERROR: GEMINI_API_KEY is not set in environment variables");
+  process.exit(1);
 }
 
-// Initialize Gemini AI client
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+// Initialize Gemini client (NEW SDK)
+const client = new GoogleGenAI({
+  apiKey: GEMINI_API_KEY,
+});
 
 // =============================================================
-// SYSTEM PROMPT - Academic Tutor Persona
+// SYSTEM PROMPT
 // =============================================================
 
-const SYSTEM_PROMPT = `You are Aletheia, an expert academic tutor designed to help students learn effectively.
+const SYSTEM_PROMPT = `You are Aletheia, an expert academic tutor.
 
-Your teaching style:
-- BEGINNER-FRIENDLY: Assume the student is new to the topic
-- STEP-BY-STEP: Break down complex concepts into small, digestible steps
-- SIMPLE LANGUAGE: Avoid jargon; when technical terms are needed, explain them
-- EXAMPLES: Use real-world examples and analogies to illustrate concepts
-- ENCOURAGING: Be supportive and patient
+Teaching style:
+- Beginner-friendly
+- Step-by-step explanations
+- Simple language
+- Examples and analogies
+- Encouraging tone
 
-Response format:
-- Use markdown for formatting (headers, lists, code blocks)
-- Keep paragraphs short (2-3 sentences max)
-- End with a quick comprehension check when appropriate
-
-Remember: Your goal is to help students truly UNDERSTAND, not just memorize.`;
+Format:
+- Use markdown
+- Short paragraphs
+- End with a quick check question when useful.`;
 
 // =============================================================
 // EXPRESS APP SETUP
@@ -54,305 +53,154 @@ Remember: Your goal is to help students truly UNDERSTAND, not just memorize.`;
 
 const app = express();
 
-// Middleware
 app.use(cors({
-    origin: function (origin, callback) {
-        // Allow requests from any localhost port for development
-        if (!origin || origin.startsWith('http://localhost')) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    methods: ['POST', 'GET'],
-    credentials: true
+  origin: true,
+  methods: ["GET", "POST"],
 }));
+
 app.use(express.json());
 
 // =============================================================
 // ROUTES
 // =============================================================
 
-/**
- * Health check endpoint
- * GET /api/health
- */
-app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        message: 'Erudite backend is running',
-        timestamp: new Date().toISOString()
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    message: "Erudite backend is running",
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ---------------- CHAT ----------------
+
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+
+    if (!message || typeof message !== "string") {
+      return res.status(400).json({ error: "Message must be a string" });
+    }
+
+    const response = await client.models.generateContent({
+      model: "models/gemini-flash-lite-latest",
+      contents: message.trim(),
+      systemInstruction: SYSTEM_PROMPT,
     });
+
+    res.json({
+      reply: response.text,
+      model: "gemini-flash-lite-latest",
+    });
+
+  } catch (error) {
+    console.error("❌ Chat Error:", error.message);
+    res.status(500).json({ error: "Failed to generate response" });
+  }
 });
 
-/**
- * Chat endpoint - Main Gemini integration
- * POST /api/chat
- * 
- * Request body: { "message": "user question here" }
- * Response: { "reply": "Gemini response here" }
- */
-app.post('/api/chat', async (req, res) => {
-    try {
-        // 1. Validate input
-        const { message } = req.body;
+// ---------------- CHAT WITH CONTEXT ----------------
 
-        if (!message || typeof message !== 'string') {
-            return res.status(400).json({
-                error: 'Invalid request',
-                details: 'Message is required and must be a string'
-            });
-        }
+app.post("/api/chat/context", async (req, res) => {
+  try {
+    const { message, context, difficulty = "beginner" } = req.body;
 
-        if (message.trim().length === 0) {
-            return res.status(400).json({
-                error: 'Invalid request',
-                details: 'Message cannot be empty'
-            });
-        }
-
-        // 2. Initialize Gemini model
-        // Using gemini-flash-lite-latest (free tier compatible)
-        const model = genAI.getGenerativeModel({
-            model: 'models/gemini-flash-lite-latest',
-            systemInstruction: SYSTEM_PROMPT,
-        });
-
-        // 3. Start chat session and send message
-        const chat = model.startChat({ history: [] });
-        const result = await chat.sendMessage(message.trim());
-
-        // 4. Extract response text
-        const reply = result.response.text();
-
-        // 5. Return successful response
-        return res.json({
-            reply,
-            model: 'gemini-flash-lite-latest'
-        });
-
-    } catch (error) {
-        console.error('❌ Gemini API Error:', error.message);
-
-        // Handle specific error types
-        if (error.message?.includes('quota')) {
-            return res.status(429).json({
-                error: 'Rate limit exceeded',
-                details: 'API quota reached. Please wait a moment and try again.'
-            });
-        }
-
-        if (error.message?.includes('API key')) {
-            return res.status(401).json({
-                error: 'Authentication error',
-                details: 'Invalid API key configuration.'
-            });
-        }
-
-        // Generic error response
-        return res.status(500).json({
-            error: 'Internal server error',
-            details: 'Failed to get response from AI. Please try again.'
-        });
+    if (!message) {
+      return res.status(400).json({ error: "Message required" });
     }
+
+    let prompt = SYSTEM_PROMPT;
+
+    if (context) {
+      prompt += `\n\nSTUDY MATERIAL:\n${context.substring(0, 8000)}`;
+    }
+
+    prompt += `\n\nDIFFICULTY: ${difficulty}`;
+
+    const response = await client.models.generateContent({
+      model: "models/gemini-flash-lite-latest",
+      contents: message.trim(),
+      systemInstruction: prompt,
+    });
+
+    res.json({ reply: response.text });
+
+  } catch (error) {
+    console.error("❌ Context Chat Error:", error.message);
+    res.status(500).json({ error: "Context chat failed" });
+  }
 });
 
-/**
- * Chat with context endpoint - For PDF-based learning
- * POST /api/chat/context
- * 
- * Request body: { "message": "...", "context": "PDF content...", "difficulty": "beginner" }
- */
-app.post('/api/chat/context', async (req, res) => {
-    try {
-        const { message, context, difficulty = 'beginner' } = req.body;
+// ---------------- CONCEPT MAP ----------------
 
-        if (!message) {
-            return res.status(400).json({ error: 'Message is required' });
-        }
+app.post("/api/concept-map", async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: "Content required" });
 
-        // Build enhanced system prompt with context
-        let enhancedPrompt = SYSTEM_PROMPT;
+    const prompt = `
+Extract key concepts and relationships.
+Return ONLY valid JSON.
 
-        if (context) {
-            enhancedPrompt += `\n\n=== STUDY MATERIAL ===\nThe student is learning from the following document. Use this as the primary source for your explanations:\n\n${context}`;
-        }
+Document:
+${content.substring(0, 8000)}
+`;
 
-        enhancedPrompt += `\n\n=== DIFFICULTY LEVEL: ${difficulty.toUpperCase()} ===`;
+    const response = await client.models.generateContent({
+      model: "models/gemini-flash-lite-latest",
+      contents: prompt,
+    });
 
-        if (difficulty === 'beginner') {
-            enhancedPrompt += '\nUse very simple language, lots of analogies, and break everything into tiny steps.';
-        } else if (difficulty === 'intermediate') {
-            enhancedPrompt += '\nUse some technical terms (with explanations) and make connections between concepts.';
-        } else if (difficulty === 'exam') {
-            enhancedPrompt += '\nFocus on exam-relevant points, formulas, and common test questions.';
-        }
+    const text = response.text;
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { nodes: [], links: [] };
 
-        const model = genAI.getGenerativeModel({
-            model: 'models/gemini-flash-lite-latest',
-            systemInstruction: enhancedPrompt,
-        });
+    res.json(data);
 
-        const chat = model.startChat({ history: [] });
-        const result = await chat.sendMessage(message.trim());
-        const reply = result.response.text();
-
-        return res.json({ reply });
-
-    } catch (error) {
-        console.error('❌ Context Chat Error:', error.message);
-        return res.status(500).json({
-            error: 'Failed to process request',
-            details: error.message
-        });
-    }
+  } catch (error) {
+    console.error("❌ Concept Map Error:", error.message);
+    res.status(500).json({ error: "Concept map failed" });
+  }
 });
 
-/**
- * Extract concept map from PDF content
- * POST /api/concept-map
- */
-app.post('/api/concept-map', async (req, res) => {
-    try {
-        const { content } = req.body;
+// ---------------- STUDY PLAN ----------------
 
-        if (!content) {
-            return res.status(400).json({ error: 'PDF content is required' });
-        }
+app.post("/api/study-plan", async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: "Content required" });
 
-        const prompt = `Analyze this academic document and extract the key concepts and their relationships.
+    const response = await client.models.generateContent({
+      model: "models/gemini-flash-lite-latest",
+      contents: `Create a study plan:\n${content.substring(0, 8000)}`,
+    });
 
-Return a JSON object with this exact structure:
-{
-  "nodes": [
-    { "id": "1", "name": "Concept Name", "category": "main|sub|detail" }
-  ],
-  "links": [
-    { "source": "1", "target": "2", "relationship": "requires|leads-to|part-of" }
-  ]
-}
+    res.json({ studyPlan: response.text });
 
-Rules:
-- Extract 5-15 key concepts
-- Identify prerequisite relationships (which concepts need to be understood first)
-- Use categories: "main" for primary topics, "sub" for subtopics, "detail" for specific facts
-- Return ONLY valid JSON, no other text
-
-Document content:
-${content.substring(0, 8000)}`;
-
-        const model = genAI.getGenerativeModel({
-            model: 'models/gemini-flash-lite-latest',
-        });
-
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
-
-        // Try to parse JSON from response
-        let conceptMap;
-        try {
-            // Extract JSON from response (may be wrapped in markdown code blocks)
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-            conceptMap = jsonMatch ? JSON.parse(jsonMatch[0]) : { nodes: [], links: [] };
-        } catch {
-            conceptMap = { nodes: [], links: [] };
-        }
-
-        return res.json(conceptMap);
-
-    } catch (error) {
-        console.error('❌ Concept Map Error:', error.message);
-        return res.status(500).json({ error: 'Failed to generate concept map', details: error.message });
-    }
+  } catch (error) {
+    console.error("❌ Study Plan Error:", error.message);
+    res.status(500).json({ error: "Study plan failed" });
+  }
 });
 
-/**
- * Generate study plan from PDF content
- * POST /api/study-plan
- */
-app.post('/api/study-plan', async (req, res) => {
-    try {
-        const { content, weakConcepts = [] } = req.body;
+// ---------------- REVISION SHEET ----------------
 
-        if (!content) {
-            return res.status(400).json({ error: 'PDF content is required' });
-        }
+app.post("/api/revision-sheet", async (req, res) => {
+  try {
+    const { content } = req.body;
+    if (!content) return res.status(400).json({ error: "Content required" });
 
-        const prompt = `You are an expert learning strategist. Create a personalized study plan based on this academic document.
+    const response = await client.models.generateContent({
+      model: "models/gemini-flash-lite-latest",
+      contents: `Create a revision sheet:\n${content.substring(0, 8000)}`,
+    });
 
-${weakConcepts.length > 0 ? `The student has identified these weak areas: ${weakConcepts.join(', ')}` : ''}
+    res.json({ revisionSheet: response.text });
 
-Create a comprehensive study plan with:
-1. **Learning Objectives** - What the student will master
-2. **Prerequisites Check** - Concepts to review first
-3. **Study Sessions** - Break down into 30-minute blocks
-4. **Key Formulas/Definitions** - Must-know items
-5. **Practice Questions** - Self-assessment questions
-6. **Review Schedule** - Spaced repetition timeline
-
-Format in clear, readable markdown.
-
-Document content:
-${content.substring(0, 8000)}`;
-
-        const model = genAI.getGenerativeModel({
-            model: 'models/gemini-flash-lite-latest',
-        });
-
-        const result = await model.generateContent(prompt);
-        const studyPlan = result.response.text();
-
-        return res.json({ studyPlan });
-
-    } catch (error) {
-        console.error('❌ Study Plan Error:', error.message);
-        return res.status(500).json({ error: 'Failed to generate study plan', details: error.message });
-    }
-});
-
-/**
- * Generate revision sheet from PDF content
- * POST /api/revision-sheet
- */
-app.post('/api/revision-sheet', async (req, res) => {
-    try {
-        const { content, weakConcepts = [] } = req.body;
-
-        if (!content) {
-            return res.status(400).json({ error: 'PDF content is required' });
-        }
-
-        const prompt = `Create a concise one-page revision sheet from this academic document.
-
-${weakConcepts.length > 0 ? `Focus especially on these weak areas: ${weakConcepts.join(', ')}` : ''}
-
-Include:
-1. **Key Definitions** (5-10 most important)
-2. **Essential Formulas** (if applicable)
-3. **Quick Facts** (bullet points)
-4. **Common Mistakes to Avoid**
-5. **Memory Tricks** (mnemonics if helpful)
-6. **5-Question Quick Quiz** (with answers)
-
-Keep it concise - this should fit on one page when printed.
-Format in clean markdown.
-
-Document content:
-${content.substring(0, 8000)}`;
-
-        const model = genAI.getGenerativeModel({
-            model: 'models/gemini-flash-lite-latest',
-        });
-
-        const result = await model.generateContent(prompt);
-        const revisionSheet = result.response.text();
-
-        return res.json({ revisionSheet });
-
-    } catch (error) {
-        console.error('❌ Revision Sheet Error:', error.message);
-        return res.status(500).json({ error: 'Failed to generate revision sheet', details: error.message });
-    }
+  } catch (error) {
+    console.error("❌ Revision Sheet Error:", error.message);
+    res.status(500).json({ error: "Revision sheet failed" });
+  }
 });
 
 // =============================================================
@@ -360,24 +208,9 @@ ${content.substring(0, 8000)}`;
 // =============================================================
 
 app.listen(PORT, () => {
-    console.log('');
-    console.log('🎓 ═══════════════════════════════════════════════════');
-    console.log('   ERUDITE BACKEND SERVER');
-    console.log('═══════════════════════════════════════════════════');
-    console.log(`   ✅ Server running on http://localhost:${PORT}`);
-    console.log(`   ✅ Gemini model: gemini-flash-lite-latest`);
-    console.log(`   ✅ CORS enabled for localhost`);
-    console.log('');
-    console.log('   Endpoints:');
-    console.log(`   • GET  /api/health         - Health check`);
-    console.log(`   • POST /api/chat           - Chat with Aletheia`);
-    console.log(`   • POST /api/chat/context   - Chat with PDF context`);
-    console.log(`   • POST /api/concept-map    - Extract concept map`);
-    console.log(`   • POST /api/study-plan     - Generate study plan`);
-    console.log(`   • POST /api/revision-sheet - Generate revision sheet`);
-    console.log('═══════════════════════════════════════════════════');
-    console.log('');
+  console.log("🎓 ERUDITE BACKEND RUNNING");
+  console.log(`🚀 Port: ${PORT}`);
+  console.log("🤖 Gemini: gemini-flash-lite-latest");
 });
 
 export default app;
-
