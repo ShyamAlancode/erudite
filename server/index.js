@@ -30,21 +30,25 @@ app.get("/api/health", (req, res) => {
 /* ✅ WORKING CHAT ENDPOINT */
 app.post("/api/chat", async (req, res) => {
     try {
+        if (!req.body) {
+            return res.status(400).json({
+                error: "Request body missing",
+                hint: "Did you send Content-Type: application/json ?"
+            });
+        }
+
         const { message } = req.body;
 
-        if (!message) {
-            return res.status(400).json({ error: "Message is required" });
+        if (!message || typeof message !== "string") {
+            return res.status(400).json({
+                error: "Invalid message",
+                details: "message must be a non-empty string"
+            });
         }
 
         const response = await genAI.models.generateContent({
             model: "models/gemini-flash-latest",
             contents: message,
-            config: {
-                systemInstruction: `
-You are Aletheia, an expert academic tutor.
-Explain concepts step-by-step, simply, with examples.
-        `,
-            },
         });
 
         res.json({
@@ -52,7 +56,8 @@ Explain concepts step-by-step, simply, with examples.
         });
 
     } catch (err) {
-        console.error("❌ GEMINI ERROR:", err);
+        console.error("❌ Chat Error:", err);
+
         res.status(500).json({
             error: "Failed to generate response",
             details: err.message,
