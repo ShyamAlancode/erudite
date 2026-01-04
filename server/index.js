@@ -94,39 +94,23 @@ app.get('/api/health', (req, res) => {
  */
 app.post('/api/chat', async (req, res) => {
     try {
-        // 1. Validate input
         const { message } = req.body;
 
         if (!message || typeof message !== 'string') {
-            return res.status(400).json({
-                error: 'Invalid request',
-                details: 'Message is required and must be a string'
-            });
+            return res.status(400).json({ error: 'Message must be a string' });
         }
 
-        if (message.trim().length === 0) {
-            return res.status(400).json({
-                error: 'Invalid request',
-                details: 'Message cannot be empty'
-            });
-        }
-
-        // 2. Initialize Gemini model
-        // Using gemini-flash-lite-latest (free tier compatible)
+        // Initialize model with system instruction
         const model = genAI.getGenerativeModel({
             model: 'models/gemini-flash-lite-latest',
             systemInstruction: SYSTEM_PROMPT,
         });
 
-        // 3. Start chat session and send message
-        const chat = model.startChat({ history: [] });
-        const result = await chat.sendMessage(message.trim());
-
-        // 4. Extract response text
+        // Generate content (stateless)
+        const result = await model.generateContent(message.trim());
         const reply = result.response.text();
 
-        // 5. Return successful response
-        return res.json({
+        res.json({
             reply,
             model: 'gemini-flash-lite-latest'
         });
